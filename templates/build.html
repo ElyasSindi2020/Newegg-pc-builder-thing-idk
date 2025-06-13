@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your PC Build</title>
+    <style>
+        :root { --primary-color: #3498db; --secondary-color: #2c3e50; --background-color: #ecf0f1; --card-bg-color: #ffffff; --text-color: #333; --danger-color: #e74c3c; --border-radius: 8px; --box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--background-color); color: var(--text-color); margin: 0; padding: 2em; }
+        .container { max-width: 900px; margin: 0 auto; background-color: var(--card-bg-color); padding: 2em; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
+        h1 { color: var(--secondary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5em; text-align: center; }
+        .back-link { display: inline-block; margin-bottom: 2em; color: var(--primary-color); text-decoration: none; font-weight: bold; }
+        .back-link:hover { text-decoration: underline; }
+        #build-summary-list { list-style-type: none; padding: 0; }
+        .part-item { display: flex; align-items: center; padding: 1em; border-bottom: 1px solid #eee; }
+        .part-item:last-child { border-bottom: none; }
+        .part-item img { width: 80px; height: 80px; object-fit: contain; margin-right: 20px; }
+        .part-details { flex-grow: 1; }
+        .part-title { font-weight: 600; color: #333; }
+        .part-price { font-weight: bold; color: var(--secondary-color); font-size: 1.2em; }
+        .total-section { margin-top: 2em; padding-top: 1.5em; border-top: 2px solid var(--secondary-color); text-align: right; }
+        .total-section h2 { margin: 0; font-size: 2em; color: var(--secondary-color); }
+        #total-price { color: var(--primary-color); font-weight: bold; }
+        #empty-build-message { text-align: center; font-size: 1.2em; color: #777; padding: 3em 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">&larr; Back to Search</a>
+        <h1 id="build-name-header">Your PC Build</h1>
+        <ul id="build-summary-list"></ul>
+        <p id="empty-build-message" style="display: none;">This build is empty. Go back and add some parts!</p>
+        <div class="total-section">
+            <h2>Total: <span id="total-price">$0.00 CAD</span></h2>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const buildListEl = document.getElementById('build-summary-list');
+            const totalPriceEl = document.getElementById('total-price');
+            const emptyMessageEl = document.getElementById('empty-build-message');
+            const headerEl = document.getElementById('build-name-header');
+
+            const formatCurrency = (number) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(number);
+
+            // --- UPDATED LOGIC TO HANDLE MULTIPLE BUILDS ---
+            const buildData = JSON.parse(localStorage.getItem('pcBuildsData') || '{}');
+            const activeBuildId = buildData.activeBuildId;
+            const activeBuild = buildData.builds && activeBuildId ? buildData.builds[activeBuildId] : null;
+
+            if (!activeBuild || activeBuild.parts.length === 0) {
+                headerEl.textContent = activeBuild ? `${activeBuild.name}` : 'Build Not Found';
+                emptyMessageEl.style.display = 'block';
+                return;
+            }
+
+            headerEl.textContent = activeBuild.name;
+
+            let total = 0;
+            activeBuild.parts.forEach(part => {
+                total += part.price_float;
+                const listItem = document.createElement('li');
+                listItem.className = 'part-item';
+                listItem.innerHTML = `
+                    <img src="${part.imageUrl}" alt="${part.title}">
+                    <div class="part-details">
+                        <div class="part-title">${part.title}</div>
+                    </div>
+                    <div class="part-price">${part.price_str}</div>
+                `;
+                buildListEl.appendChild(listItem);
+            });
+
+            totalPriceEl.textContent = formatCurrency(total);
+        });
+    </script>
+</body>
+</html>

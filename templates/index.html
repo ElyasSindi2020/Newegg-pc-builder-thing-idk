@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic PC Part Finder</title>
+    <style>
+        :root { --primary-color: #3498db; --secondary-color: #2c3e50; --background-color: #ecf0f1; --card-bg-color: #ffffff; --text-color: #333; --success-color: #2ecc71; --danger-color: #e74c3c; --border-radius: 8px; --box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--background-color); color: var(--text-color); margin: 0; padding: 20px; line-height: 1.6; }
+        .search-container { max-width: 800px; margin: 0 auto 30px auto; background: var(--card-bg-color); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
+        #search-form { display: flex; gap: 10px; }
+        #search-input { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 1.1em; }
+        #search-button { padding: 12px 25px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; font-size: 1.1em; cursor: pointer; transition: background-color 0.2s; }
+        #search-button:hover { background-color: #2980b9; }
+        #search-button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .main-layout { display: grid; grid-template-columns: 320px 1fr; gap: 30px; max-width: 1600px; margin: auto; }
+        #sidebar { display: flex; flex-direction: column; gap: 30px; position: sticky; top: 20px; height: calc(100vh - 40px); }
+        #filters-container, #your-build { background-color: var(--card-bg-color); padding: 20px; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
+        #your-build { display: flex; flex-direction: column; flex-grow: 1; }
+        .sidebar-header { margin-top: 0; color: var(--secondary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; }
+        .sidebar-header a { color: inherit; text-decoration: none; }
+        .build-management { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+        #build-selector { flex-grow: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+        .manage-btn { padding: 8px; font-size: 0.9em; border: none; border-radius: 5px; cursor: pointer; }
+        .new-btn { background-color: var(--primary-color); color: white; }
+        .delete-btn { background-color: var(--danger-color); color: white; }
+        details { border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; }
+        summary { font-weight: bold; cursor: pointer; padding: 10px; }
+        .filter-options { padding: 0 10px 10px 10px; max-height: 150px; overflow-y: auto; }
+        .filter-item { display: block; margin-bottom: 5px; }
+        #build-list { list-style-type: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; }
+        .build-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; justify-content: space-between; }
+        .build-item-name { flex-grow: 1; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .remove-btn { background-color: var(--danger-color); color: white; border: none; padding: 3px 8px; cursor: pointer; border-radius: 50%; font-size: 0.8rem; line-height: 1; }
+        .total-section { margin-top: auto; padding-top: 15px; border-top: 2px solid var(--secondary-color); text-align: right; }
+        #total-price { color: var(--primary-color); font-weight: bold; }
+        #parts-container { align-content: start; }
+        .featured-category { grid-column: 1 / -1; }
+        .featured-category h2 { margin-top: 0; margin-bottom: 15px; }
+        .horizontal-scroll-container { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
+        .horizontal-scroll-container::-webkit-scrollbar { display: none; }
+        .horizontal-scroll-container .part-card { flex: 0 0 240px; }
+        .part-card { background-color: var(--card-bg-color); border-radius: var(--border-radius); box-shadow: var(--box-shadow); display: flex; flex-direction: column; }
+        .part-card img { width: 100%; height: 150px; object-fit: contain; }
+        .part-info { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; }
+        .part-info h4 { margin: 0 0 10px 0; font-size: 1rem; flex-grow: 1; }
+        .part-price { font-size: 1.2rem; font-weight: bold; color: var(--primary-color); margin-bottom: 15px; }
+        .add-btn, .add-btn-featured { background-color: var(--success-color); color: white; border: none; padding: 10px; cursor: pointer; border-radius: 5px; font-weight: bold; width: 100%; }
+        .loader { text-align: center; padding: 3em; font-size: 1.2em; grid-column: 1 / -1; }
+        @media (max-width: 1200px) { .main-layout { grid-template-columns: 1fr; } #sidebar { position: static; height: auto; } }
+    </style>
+</head>
+<body>
+
+    <div class="search-container">
+        <form id="search-form">
+            <input type="text" id="search-input" placeholder="e.g., RTX 4070, AMD Ryzen, 32GB RAM..." required>
+            <button type="submit" id="search-button">Search</button>
+        </form>
+    </div>
+
+    <div class="main-layout">
+        <aside id="sidebar">
+            <div id="filters-container">
+                <h3 class="sidebar-header">Filters</h3>
+                <div id="filters-content"><p>Search for products to see filters.</p></div>
+            </div>
+            <div id="your-build">
+                <h3 class="sidebar-header"><a href="/build" title="View Full Build Details">Your Build 🛠️</a></h3>
+                <div class="build-management">
+                    <select id="build-selector" title="Select a build"></select>
+                    <button id="new-build-btn" class="manage-btn new-btn" title="Create New Build">New</button>
+                    <button id="delete-build-btn" class="manage-btn delete-btn" title="Delete Active Build">Delete</button>
+                </div>
+                <ul id="build-list"></ul>
+                <p id="empty-build-message" style="display: none;">This build is empty.</p>
+                <div class="total-section"><h4>Total: <span id="total-price">$0.00 CAD</span></h4></div>
+            </div>
+        </aside>
+
+        <main id="parts-container">
+            {% for category, parts in featured_data.items() %}
+            <div class="featured-category">
+                <h2>{{ category }}</h2>
+                <div class="horizontal-scroll-container">
+                    {% for part in parts %}
+                    <div class="part-card">
+                        <img src="{{ part.imageUrl }}" alt="{{ part.title }}">
+                        <div class="part-info">
+                            <h4>{{ part.title }}</h4>
+                            <div class="part-price">{{ part.price_str }}</div>
+                            <button class="add-btn-featured" data-part='{{ part | tojson | forceescape }}'>Add to Build</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+                <p class="loader">Could not load featured items. Please try searching for a part.</p>
+            {% endfor %}
+        </main>
+    </div>
+
+    <template id="part-card-template">
+        <div class="part-card">
+            <img src="" alt="Part Image">
+            <div class="part-info">
+                <h4>Part Name</h4>
+                <div class="part-price">$0.00</div>
+                <button class="add-btn">Add to Build</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM REFERENCES ---
+        const searchForm = document.getElementById('search-form');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        const partsContainer = document.getElementById('parts-container');
+        const filtersContent = document.getElementById('filters-content');
+        const buildSelector = document.getElementById('build-selector');
+        const newBuildBtn = document.getElementById('new-build-btn');
+        const deleteBuildBtn = document.getElementById('delete-build-btn');
+        const buildList = document.getElementById('build-list');
+        const totalPriceEl = document.getElementById('total-price');
+        const emptyBuildMessage = document.getElementById('empty-build-message');
+        const partCardTemplate = document.getElementById('part-card-template');
+
+        // --- STATE MANAGEMENT ---
+        let allPartsFromSearch = [];
+        let activeFilters = { brands: [], types: [] };
+        let buildData = {};
+
+        // --- BUILD MANAGEMENT FUNCTIONS ---
+        const loadBuildData = () => {
+            const savedData = localStorage.getItem('pcBuildsData');
+            if (savedData) {
+                buildData = JSON.parse(savedData);
+            } else {
+                const firstBuildId = `build-${Date.now()}`;
+                buildData = { builds: { [firstBuildId]: { name: "My First Build", parts: [] } }, activeBuildId: firstBuildId };
+            }
+            saveBuildData();
+        };
+        const saveBuildData = () => localStorage.setItem('pcBuildsData', JSON.stringify(buildData));
+        const updateBuildSelector = () => {
+            buildSelector.innerHTML = '';
+            for (const id in buildData.builds) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = buildData.builds[id].name;
+                buildSelector.appendChild(option);
+            }
+            buildSelector.value = buildData.activeBuildId;
+        };
+        const renderActiveBuild = () => {
+            const activeBuild = buildData.builds[buildData.activeBuildId];
+            if (!activeBuild) return;
+            buildList.innerHTML = '';
+            emptyBuildMessage.style.display = activeBuild.parts.length === 0 ? 'block' : 'none';
+            let total = 0;
+            activeBuild.parts.forEach((part, index) => {
+                total += part.price_float;
+                const listItem = document.createElement('li');
+                listItem.className = 'build-item';
+                listItem.innerHTML = `<span class="build-item-name">${part.title}</span><button class="remove-btn" data-build-index="${index}">X</button>`;
+                buildList.appendChild(listItem);
+            });
+            totalPriceEl.textContent = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(total);
+        };
+
+        // --- SEARCH, FILTER, AND RENDER FUNCTIONS ---
+        const renderSearchResults = (parts) => {
+            partsContainer.innerHTML = '';
+            partsContainer.style.display = 'grid'; // Set display back to grid for search results
+            if (parts.length === 0) { partsContainer.innerHTML = '<p class="loader">No products match your criteria.</p>'; return; }
+            parts.forEach(part => {
+                const card = partCardTemplate.content.cloneNode(true).children[0];
+                card.querySelector('img').src = part.imageUrl;
+                card.querySelector('h4').textContent = part.title;
+                card.querySelector('.part-price').textContent = part.price_str;
+                card.querySelector('.add-btn').dataset.partId = part.id;
+                partsContainer.appendChild(card);
+            });
+        };
+        const applyFilters = () => {
+            let filteredParts = allPartsFromSearch;
+            if (activeFilters.brands.length > 0) { filteredParts = filteredParts.filter(part => activeFilters.brands.some(brand => part.title.toLowerCase().includes(brand.toLowerCase()))); }
+            if (activeFilters.types.length > 0) { filteredParts = filteredParts.filter(part => activeFilters.types.some(type => part.title.toLowerCase().includes(type.toLowerCase()))); }
+            renderSearchResults(filteredParts);
+        };
+        const generateFilters = () => {
+            const brands = new Set(), types = new Set();
+            const knownBrands = ["AMD", "Intel", "NVIDIA", "ASUS", "MSI", "Gigabyte", "Corsair", "G.Skill", "Samsung", "Crucial", "Kingston", "Lian Li", "Noctua"];
+            const knownTypes = ["DDR5", "DDR4", "RTX", "RX", "Ryzen", "Core i9", "Core i7", "Core i5"];
+            allPartsFromSearch.forEach(part => {
+                knownBrands.forEach(b => { if (part.title.toLowerCase().includes(b.toLowerCase())) brands.add(b); });
+                knownTypes.forEach(t => { if (part.title.toLowerCase().includes(t.toLowerCase())) types.add(t); });
+            });
+            if (brands.size === 0 && types.size === 0) { filtersContent.innerHTML = "<p>No specific filters could be generated.</p>"; return; }
+            let filtersHTML = '';
+            if (brands.size > 0) { filtersHTML += `<details open><summary>Brands</summary><div class="filter-options" data-filter-type="brands">${[...brands].sort().map(b => `<label class="filter-item"><input type="checkbox" value="${b}"> ${b}</label>`).join('')}</div></details>`; }
+            if (types.size > 0) { filtersHTML += `<details open><summary>Type</summary><div class="filter-options" data-filter-type="types">${[...types].sort().map(t => `<label class="filter-item"><input type="checkbox" value="${t}"> ${t}</label>`).join('')}</div></details>`; }
+            filtersContent.innerHTML = filtersHTML;
+        };
+
+        // --- AUTOSCROLL FUNCTION ---
+        const startAutoScrollers = () => {
+            document.querySelectorAll('.horizontal-scroll-container').forEach(scroller => {
+                const items = Array.from(scroller.children);
+                items.forEach(item => { scroller.appendChild(item.cloneNode(true)); });
+                let isPaused = false;
+                scroller.addEventListener('mouseenter', () => isPaused = true);
+                scroller.addEventListener('mouseleave', () => isPaused = false);
+                setInterval(() => {
+                    if (!isPaused) {
+                        scroller.scrollLeft += 1;
+                        if (scroller.scrollLeft >= scroller.scrollWidth / 2) { scroller.scrollLeft = 0; }
+                    }
+                }, 10);
+            });
+        };
+
+        // --- EVENT LISTENERS ---
+        searchForm.addEventListener('submit', (event) => {
+            event.preventDefault(); const query = searchInput.value.trim(); if (!query) return;
+            searchButton.disabled = true; searchButton.textContent = "Searching...";
+            partsContainer.innerHTML = '<p class="loader">Fetching data from Newegg.ca...</p>';
+            filtersContent.innerHTML = '<p>Loading filters...</p>';
+            allPartsFromSearch = []; activeFilters = { brands: [], types: [] };
+            fetch(`/api/search?q=${encodeURIComponent(query)}`).then(res => res.json()).then(data => {
+                allPartsFromSearch = data; renderSearchResults(allPartsFromSearch); generateFilters();
+            }).catch(err => console.error(err)).finally(() => { searchButton.disabled = false; searchButton.textContent = "Search"; });
+        });
+
+        filtersContent.addEventListener('change', (event) => {
+            if (event.target.type === 'checkbox') {
+                const filterType = event.target.closest('.filter-options').dataset.filterType;
+                const value = event.target.value;
+                if (event.target.checked) { activeFilters[filterType].push(value); } else { activeFilters[filterType] = activeFilters[filterType].filter(item => item !== value); }
+                applyFilters();
+            }
+        });
+
+        partsContainer.addEventListener('click', (event) => {
+            let partToAdd = null;
+            if (event.target.matches('.add-btn')) { partToAdd = allPartsFromSearch.find(p => p.id === event.target.dataset.partId); }
+            if (event.target.matches('.add-btn-featured')) { partToAdd = JSON.parse(event.target.dataset.part); }
+            if (partToAdd && buildData.activeBuildId) { buildData.builds[buildData.activeBuildId].parts.push(partToAdd); saveBuildData(); renderActiveBuild(); }
+        });
+
+        buildList.addEventListener('click', (event) => {
+            if (event.target.matches('.remove-btn')) {
+                const buildIndex = parseInt(event.target.dataset.buildIndex, 10);
+                buildData.builds[buildData.activeBuildId].parts.splice(buildIndex, 1);
+                saveBuildData(); renderActiveBuild();
+            }
+        });
+
+        newBuildBtn.addEventListener('click', () => {
+            const buildName = prompt("Enter a name for your new build:", `Build #${Object.keys(buildData.builds).length + 1}`);
+            if (buildName) { const newBuildId = `build-${Date.now()}`; buildData.builds[newBuildId] = { name: buildName, parts: [] }; buildData.activeBuildId = newBuildId; saveBuildData(); updateBuildSelector(); renderActiveBuild(); }
+        });
+
+        deleteBuildBtn.addEventListener('click', () => {
+            const buildIds = Object.keys(buildData.builds);
+            if (buildIds.length <= 1) { alert("You cannot delete your last build!"); return; }
+            const activeBuildName = buildData.builds[buildData.activeBuildId].name;
+            if (confirm(`Are you sure you want to delete "${activeBuildName}"?`)) {
+                delete buildData.builds[buildData.activeBuildId];
+                buildData.activeBuildId = Object.keys(buildData.builds)[0];
+                saveBuildData(); updateBuildSelector(); renderActiveBuild();
+            }
+        });
+
+        buildSelector.addEventListener('change', () => {
+            buildData.activeBuildId = buildSelector.value;
+            saveBuildData();
+            renderActiveBuild();
+        });
+
+        // --- INITIALIZATION ---
+        loadBuildData();
+        updateBuildSelector();
+        renderActiveBuild();
+        startAutoScrollers();
+    });
+    </script>
+</body>
+</html>
